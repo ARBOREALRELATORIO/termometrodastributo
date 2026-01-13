@@ -4,10 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Termômetro de DAS</title>
+
   <style>
     /* =========================================================
-       TEMA (DARK = padrão) + TEMA (LIGHT = P&B na interface,
-       MAS mantendo o gradiente térmico do termômetro)
+       TEMA (DARK = padrão) + TEMA (LIGHT)
        ========================================================= */
 
     :root{
@@ -39,7 +39,7 @@
       --btnBgHover: rgba(96,165,250,.20);
     }
 
-    /* LIGHT (interface P&B, mas termômetro mantém cores) */
+    /* LIGHT */
     body[data-theme="light"]{
       --bg:#ffffff;
       --bg2:#f6f7fb;
@@ -51,15 +51,13 @@
       --line:rgba(0,0,0,.12);
       --accent:#111827;
 
-      /* Interface em P&B */
+      /* Termômetro mantém cores */
       --good:#22c55e;
---warn:#f59e0b;
---bad:#ef4444;
+      --warn:#f59e0b;
+      --bad:#ef4444;
 
       --thermoGlass: rgba(0,0,0,.06);
       --thermoBorder: rgba(0,0,0,.18);
-      /* ✅ NÃO sobrescreve --thermoFill/2/3 aqui
-         para manter o gradiente verde→amarelo→vermelho */
 
       --shadow: 0 14px 40px rgba(15,23,42,.10);
       --pillBg: rgba(0,0,0,.03);
@@ -106,6 +104,7 @@
       align-items:center;
       justify-content:flex-end;
       padding-top:2px;
+      flex-wrap:wrap;
     }
 
     .wrap{
@@ -158,7 +157,7 @@
       letter-spacing:.2px;
     }
 
-    input[type="file"], input[type="text"]{
+    input[type="text"]{
       width: 100%;
       padding:10px 10px;
       border-radius:12px;
@@ -308,10 +307,6 @@
       background: linear-gradient(180deg, var(--thermoFill3) 0%, var(--thermoFill2) 55%, var(--thermoFill) 100%);
       transition: height .7s ease, background .25s ease;
     }
-    /* ✅ ajuste fino no claro: mantém as cores, mas com acabamento mais elegante */
-    body[data-theme="light"] .fill{
-      filter: saturate(.92) brightness(.96);
-    }
 
     .bulb{
       position:absolute;
@@ -367,8 +362,18 @@
         0 0 30px rgba(245,158,11,.22);
     }
 
-    /* (opcional) no modo claro, mantém laranja também (fica bonito e comunica meta) */
-    /* Se quiser P&B total na cap do claro, eu te passo a versão alternativa. */
+    body[data-theme="light"] .cap.hot{
+      background: rgba(0,0,0,.18);
+      border-color: rgba(0,0,0,.40);
+      box-shadow: 0 0 10px rgba(0,0,0,.08);
+    }
+    body[data-theme="light"] .cap.max{
+      background: rgba(0,0,0,.65);
+      border-color: rgba(0,0,0,.70);
+      box-shadow:
+        0 0 16px rgba(0,0,0,.15),
+        0 0 30px rgba(0,0,0,.08);
+    }
 
     .ticks{
       position:absolute;
@@ -576,12 +581,12 @@
   </style>
 </head>
 
-<body>
+<body data-theme="dark">
   <header>
     <div class="headLeft">
       <h1>Termômetro de DAS</h1>
       <p class="sub">
-        CSV com meta + linhas <b>Empresa;Tipo;TotalVendas</b>.
+        CSV fixo com meta + linhas <b>Empresa;Tipo;TotalVendas</b>.
         Regra: <b>MATRIZ = 14%</b> • <b>FILIAL = 11%</b>.
         Meta pode ser <b>META_DAS</b> (padrão) ou <b>META_VENDAS</b>.
         (Se o Tipo vier vazio, usa fallback WOOD/ARBO/CAMP = 14%.)
@@ -589,10 +594,11 @@
     </div>
 
     <div class="headActions">
-      <button type="button" id="toggleThemeBtn" class="themeBtn" aria-label="Alternar tema">
-        <span class="dot" aria-hidden="true"></span>
-        <span class="label" id="themeLabel">Modo Claro</span>
+      <button type="button" class="themeBtn" id="themeBtn">
+        <span class="dot"></span><span class="label" id="themeLabel">Tema: Escuro</span>
       </button>
+
+      <button type="button" id="reloadBtn">Recarregar CSV</button>
     </div>
   </header>
 
@@ -602,13 +608,11 @@
       <div class="row">
         <div class="pill">
           <div style="width:100%">
-            <label>1) Carregar CSV</label>
-            <input id="csvFile" type="file" accept=".csv,text/csv" />
+            <label>Fonte do CSV (fixo)</label>
+            <div id="csvInfo" class="small">—</div>
             <div class="small">
-              Exemplos de META:<br/>
-              <b>META_DAS;50000</b> <span class="muted">(pico em DAS)</span> ou <b>META_VENDAS;50000</b> <span class="muted">(pico em Vendas)</span><br/>
-              <b>Empresa;Tipo;TotalVendas</b><br/>
-              Ex.: <b>WOOD;MATRIZ;125000</b> | <b>SALTO;FILIAL;42000</b>
+              O relatório carrega automaticamente um arquivo CSV fixo via URL.
+              (Sem upload — aqui é “sem livre arbítrio”, do jeito certo.)
             </div>
           </div>
         </div>
@@ -682,51 +686,34 @@
   </main>
 
   <script>
-    /* =========================
-       Alternância de tema
-       ========================= */
-    const THEME_KEY = "das_report_theme";
-    const toggleThemeBtn = document.getElementById("toggleThemeBtn");
-    const themeLabel = document.getElementById("themeLabel");
+    /* =========================================================
+       CONFIG: CSV FIXO
+       ========================================================= */
 
-    function applyTheme(theme){
-      if(theme === "light") document.body.setAttribute("data-theme","light");
-      else document.body.removeAttribute("data-theme");
+    // ✅ Troque para a URL do seu CSV (mesmo domínio do HTML ou link público com CORS liberado)
+    // Exemplos:
+    // - Mesmo servidor: "./dados/das_termometro.csv"
+    // - URL pública (com CORS ok): "https://seusite.com.br/das_termometro.csv"
+    const CSV_URL = "./dados.csv";
 
-      const isLight = (theme === "light");
-      themeLabel.textContent = isLight ? "Modo Escuro" : "Modo Claro";
-      // (sim: o botão mostra a AÇÃO, não o estado — menos clique mental)
-    }
+    // Se quiser evitar cache (recarregar sempre o arquivo "fresco"):
+    const BYPASS_CACHE = true;
 
-    function getInitialTheme(){
-      const saved = localStorage.getItem(THEME_KEY);
-      if(saved === "light" || saved === "dark") return saved;
-      // fallback: segue preferência do sistema
-      const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
-      return prefersLight ? "light" : "dark";
-    }
+    /* =========================================================
+       REGRAS
+       ========================================================= */
 
-    let currentTheme = getInitialTheme();
-    applyTheme(currentTheme);
-
-    toggleThemeBtn.addEventListener("click", () => {
-      currentTheme = (currentTheme === "dark") ? "light" : "dark";
-      localStorage.setItem(THEME_KEY, currentTheme);
-      applyTheme(currentTheme);
-    });
-
-    // --- Regras ---
     const RATE_14 = 0.14;
     const RATE_11 = 0.11;
-
-    // fallback se Tipo vier vazio
     const SPECIAL_14 = new Set(["WOOD","ARBO","CAMP"]);
 
-    // --- Meta Mode ---
     const GOAL_MODE_DAS = "DAS";
     const GOAL_MODE_VENDAS = "VENDAS";
 
-    // --- Utilitários ---
+    /* =========================================================
+       UTILITÁRIOS
+       ========================================================= */
+
     function normalizeKey(s){
       return String(s ?? "")
         .trim()
@@ -792,14 +779,11 @@
 
     function showMsg(type, html){
       const el = document.getElementById("statusMsg");
-      if(!html){
-        el.innerHTML = "";
-        return;
-      }
+      if(!html){ el.innerHTML = ""; return; }
       el.innerHTML = `<div class="${type}">${html}</div>`;
     }
 
-    function statusForProgress(p){ // p 0..1
+    function statusForProgress(p){
       if(p < 0.60) return "var(--good)";
       if(p < 0.85) return "var(--warn)";
       return "var(--bad)";
@@ -809,7 +793,6 @@
       const t = normalizeTipo(tipo);
       if(t === "MATRIZ") return RATE_14;
       if(t === "FILIAL") return RATE_11;
-
       const key = normalizeKey(id);
       return SPECIAL_14.has(key) ? RATE_14 : RATE_11;
     }
@@ -821,6 +804,10 @@
     function progressLabel(goalMode){
       return goalMode === GOAL_MODE_VENDAS ? "Progresso (Vendas vs META)" : "Progresso (DAS vs META)";
     }
+
+    /* =========================================================
+       PARSE CSV
+       ========================================================= */
 
     function parseCSV(text){
       const delim = pickDelimiter(text);
@@ -917,6 +904,10 @@
       return { goal, goalMode, rows };
     }
 
+    /* =========================================================
+       RENDER
+       ========================================================= */
+
     function render(goal, rows, goalMode){
       const rawTable = document.getElementById("rawTable");
       const rawBody  = document.getElementById("rawBody");
@@ -963,6 +954,7 @@
           if(!tOld) cur.tipo = tNew;
           else if(tOld !== tNew) cur.tipo = "MISTO";
         }
+
         map.set(k, cur);
       }
 
@@ -1006,7 +998,7 @@
 
       for(const it of items){
         const pct = Math.round(it.progress * 100);
-        const color = statusForProgress(it.progress);
+
         const capClass = (it.ratio >= 1) ? "max" : (it.ratio >= 0.90 ? "hot" : "");
 
         const tipoLabel = it.tipo ? it.tipo : "NÃO INFORMADO";
@@ -1020,6 +1012,7 @@
 
         const baseLabel = (goalMode === GOAL_MODE_VENDAS) ? "Vendas" : "DAS";
         const metaLabel = (goalMode === GOAL_MODE_VENDAS) ? "META (pico) — Vendas (R$)" : "META (pico) — DAS (R$)";
+
         const progressText = (goalMode === GOAL_MODE_VENDAS)
           ? `Progresso = <b>Vendas / META</b>. Se ultrapassar 100%, o termômetro encosta no topo.`
           : `Progresso = <b>DAS / META</b>. Se ultrapassar 100%, o termômetro encosta no topo.`;
@@ -1041,6 +1034,7 @@
                 <div class="thermometer" aria-label="Termômetro">
                   <div class="cap ${capClass}"></div>
                   <div class="tube">
+                    <!-- ✅ sem background inline: gradiente fica igual nos 2 temas -->
                     <div class="fill" style="height:0%;"></div>
                   </div>
                   <div class="ticks" aria-hidden="true">
@@ -1087,17 +1081,83 @@
       }
     }
 
-    // --- Upload CSV ---
-    const fileInput = document.getElementById("csvFile");
-    fileInput.addEventListener("change", async (e) => {
-      const f = e.target.files && e.target.files[0];
-      if(!f) return;
-      const text = await f.text();
-      const parsed = parseCSV(text);
-      render(parsed.goal, parsed.rows, parsed.goalMode);
+    /* =========================================================
+       CSV FIXO: CARREGAR
+       ========================================================= */
+
+    function withCacheBust(url){
+      if(!BYPASS_CACHE) return url;
+      const sep = url.includes("?") ? "&" : "?";
+      return `${url}${sep}v=${Date.now()}`;
+    }
+
+    async function loadFixedCSV(){
+      const info = document.getElementById("csvInfo");
+      info.innerHTML = `Arquivo: <b>${escapeHtml(CSV_URL)}</b>`;
+
+      try{
+        showMsg("ok", "Carregando CSV fixo...");
+        const res = await fetch(withCacheBust(CSV_URL), { cache: "no-store" });
+
+        if(!res.ok){
+          throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+        }
+
+        const text = await res.text();
+        const parsed = parseCSV(text);
+        render(parsed.goal, parsed.rows, parsed.goalMode);
+
+      } catch(err){
+        showMsg("error",
+          `Não consegui carregar o CSV fixo.<br/>
+           <b>Motivo:</b> ${escapeHtml(err.message)}<br/><br/>
+           <span class="muted">
+           Dica prática: hospede este HTML e o CSV no mesmo domínio/pasta (ex.: <b>./das_termometro.csv</b>)
+           ou use uma URL pública com CORS liberado.
+           </span>`
+        );
+
+        // zera KPIs / tabelas
+        document.getElementById("kpiGoal").textContent  = "—";
+        document.getElementById("kpiSales").textContent = "—";
+        document.getElementById("kpiDas").textContent   = "—";
+        document.getElementById("kpiCount").textContent = "—";
+        document.getElementById("rawTable").style.display = "none";
+        document.getElementById("rawBody").innerHTML = "";
+        document.getElementById("cards").innerHTML = "";
+      }
+    }
+
+    document.getElementById("reloadBtn").addEventListener("click", loadFixedCSV);
+
+    /* =========================================================
+       TEMA (dark/light)
+       ========================================================= */
+
+    const themeBtn = document.getElementById("themeBtn");
+    const themeLabel = document.getElementById("themeLabel");
+
+    function setTheme(next){
+      document.body.setAttribute("data-theme", next);
+      themeLabel.textContent = next === "light" ? "Tema: Claro" : "Tema: Escuro";
+      try{ localStorage.setItem("das_theme", next); }catch(e){}
+    }
+
+    themeBtn.addEventListener("click", () => {
+      const cur = document.body.getAttribute("data-theme") || "dark";
+      setTheme(cur === "dark" ? "light" : "dark");
     });
 
-    // --- Editor manual ---
+    (function initTheme(){
+      let saved = "dark";
+      try{ saved = localStorage.getItem("das_theme") || "dark"; }catch(e){}
+      setTheme(saved === "light" ? "light" : "dark");
+    })();
+
+    /* =========================================================
+       EDITOR MANUAL (mantém)
+       ========================================================= */
+
     const DEFAULT_META = 50000;
     const DEFAULT_META_MODE = GOAL_MODE_DAS;
 
@@ -1181,7 +1241,10 @@
     addEditorRow();
     addEditorRow();
 
-    showMsg("ok", "Pronto. Carregue um CSV com META_DAS/META_VENDAS e colunas Empresa;Tipo;TotalVendas — ou monte e exporte pelo editor.");
+    /* =========================================================
+       INIT: carrega CSV fixo automaticamente
+       ========================================================= */
+    loadFixedCSV();
   </script>
 </body>
 </html>
