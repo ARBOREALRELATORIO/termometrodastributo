@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Termômetro de DAS</title>
+  <style>
+    /* =========================================================
+       TEMA (DARK = padrão) + TEMA (LIGHT = P&B na interface,
+       MAS mantendo o gradiente térmico do termômetro)
+       ========================================================= */
+
+    :root{
+      /* DARK */
+      --bg:#070b14;
+      --bg2:#05070d;
+      --bgAccent:#0f264f;
+
+      --card:#0f1a30;
+      --muted:#9fb0d0;
+      --text:#eaf0ff;
+      --line:rgba(255,255,255,.10);
+      --accent:#60a5fa;
+
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+
+      --thermoGlass: rgba(255,255,255,.08);
+      --thermoBorder: rgba(255,255,255,.16);
+      --thermoFill: rgba(239,68,68,.92);
+      --thermoFill2: rgba(245,158,11,.92);
+      --thermoFill3: rgba(34,197,94,.92);
+
+      --shadow: 0 14px 40px rgba(0,0,0,.25);
+      --pillBg: rgba(0,0,0,.18);
+      --inputBg: rgba(0,0,0,.22);
+      --btnBg: rgba(96,165,250,.12);
+      --btnBgHover: rgba(96,165,250,.20);
+    }
+
+    /* LIGHT (interface P&B, mas termômetro mantém cores) */
+    body[data-theme="light"]{
+      --bg:#ffffff;
+      --bg2:#f6f7fb;
+      --bgAccent:#ffffff;
+
+      --card:#ffffff;
+      --muted:rgba(0,0,0,.55);
+      --text:#0b1020;
+      --line:rgba(0,0,0,.12);
+      --accent:#111827;
+
+      /* Interface em P&B */
+      --good:#22c55e;
+--warn:#f59e0b;
+--bad:#ef4444;
+
+      --thermoGlass: rgba(0,0,0,.06);
+      --thermoBorder: rgba(0,0,0,.18);
+      /* ✅ NÃO sobrescreve --thermoFill/2/3 aqui
+         para manter o gradiente verde→amarelo→vermelho */
+
+      --shadow: 0 14px 40px rgba(15,23,42,.10);
+      --pillBg: rgba(0,0,0,.03);
+      --inputBg: rgba(0,0,0,.03);
+      --btnBg: rgba(0,0,0,.06);
+      --btnBgHover: rgba(0,0,0,.10);
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 10% 0%, var(--bgAccent) 0%, var(--bg) 55%, var(--bg2) 100%);
+      color:var(--text);
+      line-height:1.35;
+    }
+
+    header{
+      padding:26px 18px 10px;
+      max-width:1150px;
+      margin:0 auto;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .headLeft{ flex: 1 1 auto; min-width: 260px; }
+    h1{
+      margin:0 0 8px;
+      font-weight:900;
+      letter-spacing:.2px;
+      font-size: clamp(18px, 2.4vw, 28px);
+    }
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .headActions{
+      flex: 0 0 auto;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:flex-end;
+      padding-top:2px;
+    }
+
+    .wrap{
+      max-width:1150px;
+      margin:0 auto;
+      padding:14px 18px 44px;
+      display:grid;
+      gap:14px;
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      backdrop-filter: blur(6px);
+      box-shadow: var(--shadow);
+    }
+    body[data-theme="light"] .card{
+      background: linear-gradient(180deg, rgba(0,0,0,.01), rgba(0,0,0,.00));
+      backdrop-filter: none;
+    }
+
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:space-between;
+    }
+
+    .pill{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px 12px;
+      background: var(--pillBg);
+      flex: 1 1 320px;
+      min-width: 280px;
+    }
+
+    label{
+      color:var(--muted);
+      font-size:12px;
+      display:block;
+      margin-bottom:6px;
+      font-weight:800;
+      letter-spacing:.2px;
+    }
+
+    input[type="file"], input[type="text"]{
+      width: 100%;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: var(--inputBg);
+      color:var(--text);
+      outline:none;
+    }
+
+    button{
+      border:1px solid var(--line);
+      background: var(--btnBg);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:800;
+      letter-spacing:.2px;
+      white-space:nowrap;
+    }
+    button:hover{ background: var(--btnBgHover); }
+
+    .small{
+      font-size:12px;
+      color:var(--muted);
+      margin-top:8px;
+    }
+
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap:10px;
+    }
+    @media (max-width: 900px){
+      .kpis{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    .kpi{
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: var(--pillBg);
+    }
+    .kpi .t{ color:var(--muted); font-size:12px; margin-bottom:6px; font-weight:800; }
+    .kpi .v{ font-size:18px; font-weight:900; letter-spacing:.2px; }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:14px;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    /* --- Card por empresa --- */
+    .company{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+      background: var(--pillBg);
+      display:grid;
+      gap:12px;
+    }
+    .companyTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .name{
+      font-weight:950;
+      letter-spacing:.3px;
+      font-size:16px;
+    }
+    .meta{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:3px;
+    }
+    .badge{
+      font-size:12px;
+      font-weight:900;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.20);
+      white-space:nowrap;
+    }
+    body[data-theme="light"] .badge{
+      background: rgba(0,0,0,.04);
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns: 110px 1fr;
+      gap:14px;
+      align-items:stretch;
+    }
+    @media (max-width: 520px){
+      .layout{ grid-template-columns: 1fr; }
+    }
+
+    /* --- Termômetro literal --- */
+    .thermoWrap{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background: rgba(0,0,0,.16);
+      padding:12px;
+      min-height: 260px;
+    }
+    body[data-theme="light"] .thermoWrap{
+      background: rgba(0,0,0,.02);
+    }
+
+    .thermometer{
+      position:relative;
+      width: 36px;
+      height: 210px;
+    }
+    .tube{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      top:0;
+      width: 18px;
+      height: 165px;
+      border-radius: 999px;
+      background: var(--thermoGlass);
+      border: 1px solid var(--thermoBorder);
+      overflow:hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+    }
+    body[data-theme="light"] .tube{
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.03);
+    }
+
+    .fill{
+      position:absolute;
+      bottom:0;
+      left:0;
+      width:100%;
+      height: 0%;
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--thermoFill3) 0%, var(--thermoFill2) 55%, var(--thermoFill) 100%);
+      transition: height .7s ease, background .25s ease;
+    }
+    /* ✅ ajuste fino no claro: mantém as cores, mas com acabamento mais elegante */
+    body[data-theme="light"] .fill{
+      filter: saturate(.92) brightness(.96);
+    }
+
+    .bulb{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:-2px;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: var(--thermoGlass);
+      border: 1px solid var(--thermoBorder);
+      overflow:hidden;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+    }
+    body[data-theme="light"] .bulb{
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.03);
+    }
+
+    .bulb::after{
+      content:"";
+      position:absolute;
+      inset:5px;
+      border-radius:999px;
+      background: var(--thermoFill);
+      opacity:.92;
+      filter:saturate(1.05);
+    }
+
+    .cap{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      top:-8px;
+      width: 28px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid var(--thermoBorder);
+      transition: background .35s ease, border-color .35s ease, box-shadow .35s ease;
+    }
+
+    /* --- Cap alaranjada --- */
+    .cap.hot{
+      background: rgba(245,158,11,.45);
+      border-color: rgba(245,158,11,.75);
+      box-shadow: 0 0 10px rgba(245,158,11,.25);
+    }
+    .cap.max{
+      background: rgba(245,158,11,.85);
+      border-color: rgba(245,158,11,.95);
+      box-shadow:
+        0 0 16px rgba(245,158,11,.55),
+        0 0 30px rgba(245,158,11,.22);
+    }
+
+    /* (opcional) no modo claro, mantém laranja também (fica bonito e comunica meta) */
+    /* Se quiser P&B total na cap do claro, eu te passo a versão alternativa. */
+
+    .ticks{
+      position:absolute;
+      left: 28px;
+      top: 0;
+      height:165px;
+      width: 28px;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      color: rgba(255,255,255,.40);
+      font-size: 10px;
+      user-select:none;
+    }
+    body[data-theme="light"] .ticks{
+      color: rgba(0,0,0,.45);
+    }
+
+    .tick{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      transform: translateY(2px);
+    }
+    .tick::before{
+      content:"";
+      display:inline-block;
+      width: 10px;
+      height: 1px;
+      background: rgba(255,255,255,.22);
+    }
+    body[data-theme="light"] .tick::before{
+      background: rgba(0,0,0,.20);
+    }
+
+    .thermoPct{
+      margin-top:10px;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:900;
+      text-align:center;
+    }
+
+    .details{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:10px;
+    }
+    @media (max-width: 520px){
+      .details{ grid-template-columns: 1fr; }
+    }
+    .detail{
+      padding:10px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: var(--pillBg);
+    }
+    .detail .t{ color:var(--muted); font-size:12px; margin-bottom:6px; font-weight:800; }
+    .detail .v{ font-weight:950; }
+
+    .table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.14);
+      margin-top:12px;
+    }
+    body[data-theme="light"] .table{
+      background: rgba(0,0,0,.01);
+    }
+
+    .table th, .table td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--line);
+      font-size:13px;
+    }
+    .table th{
+      text-align:left;
+      color:var(--muted);
+      font-weight:900;
+      background: rgba(255,255,255,.04);
+    }
+    body[data-theme="light"] .table th{
+      background: rgba(0,0,0,.03);
+    }
+
+    .table tr:last-child td{ border-bottom:none; }
+
+    .right{text-align:right}
+    .muted{color:var(--muted)}
+    .error{
+      border:1px solid rgba(239,68,68,.35);
+      background: rgba(239,68,68,.10);
+      color: #ffd3d3;
+      border-radius:14px;
+      padding:12px;
+      font-weight:800;
+    }
+    .ok{
+      border:1px solid rgba(34,197,94,.35);
+      background: rgba(34,197,94,.10);
+      color: #d4ffea;
+      border-radius:14px;
+      padding:12px;
+      font-weight:800;
+    }
+    body[data-theme="light"] .error{
+      border:1px solid rgba(0,0,0,.20);
+      background: rgba(0,0,0,.03);
+      color: rgba(0,0,0,.85);
+    }
+    body[data-theme="light"] .ok{
+      border:1px solid rgba(0,0,0,.20);
+      background: rgba(0,0,0,.03);
+      color: rgba(0,0,0,.85);
+    }
+
+    /* --- Editor manual --- */
+    .editorGrid{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:hidden;
+      background: rgba(0,0,0,.14);
+    }
+    body[data-theme="light"] .editorGrid{
+      background: rgba(0,0,0,.01);
+    }
+
+    .editorRow{
+      display:grid;
+      grid-template-columns: 1.1fr .7fr .9fr 120px;
+      gap:0;
+      border-bottom:1px solid var(--line);
+    }
+    .editorRow.header{
+      background: rgba(255,255,255,.04);
+      color:var(--muted);
+      font-weight:900;
+      font-size:12px;
+    }
+    body[data-theme="light"] .editorRow.header{
+      background: rgba(0,0,0,.03);
+    }
+
+    .editorRow > div{
+      padding:10px;
+      border-right:1px solid var(--line);
+    }
+    .editorRow > div:last-child{ border-right:none; }
+
+    .cellInput{
+      width:100%;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: var(--inputBg);
+      color:var(--text);
+      outline:none;
+    }
+    .danger{
+      background: rgba(239,68,68,.12);
+    }
+    .danger:hover{
+      background: rgba(239,68,68,.18);
+    }
+    body[data-theme="light"] .danger{
+      background: rgba(0,0,0,.06);
+    }
+    body[data-theme="light"] .danger:hover{
+      background: rgba(0,0,0,.10);
+    }
+
+    .btnRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+      margin-top:10px;
+    }
+
+    /* Botão de tema */
+    .themeBtn{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius:12px;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: var(--text);
+      opacity:.85;
+    }
+    .themeBtn .label{
+      font-weight:900;
+      letter-spacing:.2px;
+      font-size:12px;
+      opacity:.95;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="headLeft">
+      <h1>Termômetro de DAS</h1>
+      <p class="sub">
+        CSV com meta + linhas <b>Empresa;Tipo;TotalVendas</b>.
+        Regra: <b>MATRIZ = 14%</b> • <b>FILIAL = 11%</b>.
+        Meta pode ser <b>META_DAS</b> (padrão) ou <b>META_VENDAS</b>.
+        (Se o Tipo vier vazio, usa fallback WOOD/ARBO/CAMP = 14%.)
+      </p>
+    </div>
+
+    <div class="headActions">
+      <button type="button" id="toggleThemeBtn" class="themeBtn" aria-label="Alternar tema">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="label" id="themeLabel">Modo Claro</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <section class="card">
+      <div class="row">
+        <div class="pill">
+          <div style="width:100%">
+            <label>1) Carregar CSV</label>
+            <input id="csvFile" type="file" accept=".csv,text/csv" />
+            <div class="small">
+              Exemplos de META:<br/>
+              <b>META_DAS;50000</b> <span class="muted">(pico em DAS)</span> ou <b>META_VENDAS;50000</b> <span class="muted">(pico em Vendas)</span><br/>
+              <b>Empresa;Tipo;TotalVendas</b><br/>
+              Ex.: <b>WOOD;MATRIZ;125000</b> | <b>SALTO;FILIAL;42000</b>
+            </div>
+          </div>
+        </div>
+
+        <div class="pill">
+          <div style="width:100%">
+            <label>2) (Opcional) Montar CSV aqui dentro, manualmente</label>
+
+            <div class="editorGrid" id="editor">
+              <div class="editorRow header">
+                <div>Empresa / Identificador</div>
+                <div>Tipo (MATRIZ/FILIAL)</div>
+                <div>Total de Faturamento (R$)</div>
+                <div class="right">Ações</div>
+              </div>
+              <!-- rows injected -->
+            </div>
+
+            <div class="btnRow">
+              <button type="button" id="addRowBtn">Adicionar linha</button>
+              <button type="button" id="exportCsvBtn">Exportar CSV</button>
+            </div>
+
+            <div class="small">
+              A meta será exportada como primeira linha: <b>META_DAS;valor</b> ou <b>META_VENDAS;valor</b> (definido no JS).
+              Você pode editar no CSV depois, se quiser.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="statusMsg" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <div class="kpis">
+        <div class="kpi">
+          <div class="t" id="kpiGoalTitle">META (pico do termômetro) — DAS (R$)</div>
+          <div class="v" id="kpiGoal">—</div>
+        </div>
+        <div class="kpi">
+          <div class="t">Total de Faturamento (R$)</div>
+          <div class="v" id="kpiSales">—</div>
+        </div>
+        <div class="kpi">
+          <div class="t">DAS total estimado (R$)</div>
+          <div class="v" id="kpiDas">—</div>
+        </div>
+        <div class="kpi">
+          <div class="t">Empresas no arquivo</div>
+          <div class="v" id="kpiCount">—</div>
+        </div>
+      </div>
+
+      <table class="table" id="rawTable" style="display:none">
+        <thead>
+          <tr>
+            <th>Empresa</th>
+            <th>Tipo</th>
+            <th class="right">Vendas (R$)</th>
+            <th class="right">Alíquota</th>
+            <th class="right">DAS (R$)</th>
+            <th class="right" id="progressHeader">Progresso (vs META)</th>
+          </tr>
+        </thead>
+        <tbody id="rawBody"></tbody>
+      </table>
+    </section>
+
+    <section class="grid" id="cards"></section>
+  </main>
+
+  <script>
+    /* =========================
+       Alternância de tema
+       ========================= */
+    const THEME_KEY = "das_report_theme";
+    const toggleThemeBtn = document.getElementById("toggleThemeBtn");
+    const themeLabel = document.getElementById("themeLabel");
+
+    function applyTheme(theme){
+      if(theme === "light") document.body.setAttribute("data-theme","light");
+      else document.body.removeAttribute("data-theme");
+
+      const isLight = (theme === "light");
+      themeLabel.textContent = isLight ? "Modo Escuro" : "Modo Claro";
+      // (sim: o botão mostra a AÇÃO, não o estado — menos clique mental)
+    }
+
+    function getInitialTheme(){
+      const saved = localStorage.getItem(THEME_KEY);
+      if(saved === "light" || saved === "dark") return saved;
+      // fallback: segue preferência do sistema
+      const prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+      return prefersLight ? "light" : "dark";
+    }
+
+    let currentTheme = getInitialTheme();
+    applyTheme(currentTheme);
+
+    toggleThemeBtn.addEventListener("click", () => {
+      currentTheme = (currentTheme === "dark") ? "light" : "dark";
+      localStorage.setItem(THEME_KEY, currentTheme);
+      applyTheme(currentTheme);
+    });
+
+    // --- Regras ---
+    const RATE_14 = 0.14;
+    const RATE_11 = 0.11;
+
+    // fallback se Tipo vier vazio
+    const SPECIAL_14 = new Set(["WOOD","ARBO","CAMP"]);
+
+    // --- Meta Mode ---
+    const GOAL_MODE_DAS = "DAS";
+    const GOAL_MODE_VENDAS = "VENDAS";
+
+    // --- Utilitários ---
+    function normalizeKey(s){
+      return String(s ?? "")
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g," ")
+        .replace(/[^\w\s-]/g,"");
+    }
+
+    function normalizeTipo(s){
+      const t = normalizeKey(s);
+      if(!t) return "";
+      if(t.startsWith("MAT")) return "MATRIZ";
+      if(t.startsWith("FIL")) return "FILIAL";
+      return t;
+    }
+
+    function pickDelimiter(text){
+      const firstLine = text.split(/\r?\n/).find(l => l.trim().length) || "";
+      const commas = (firstLine.match(/,/g) || []).length;
+      const semis  = (firstLine.match(/;/g) || []).length;
+      return semis > commas ? ";" : ",";
+    }
+
+    function toNumberBR(value){
+      if(value === null || value === undefined) return NaN;
+      let s = String(value).trim();
+      s = s.replace(/[R$\s]/g,"");
+
+      const hasComma = s.includes(",");
+      const hasDot = s.includes(".");
+      if(hasComma && hasDot){
+        const lastComma = s.lastIndexOf(",");
+        const lastDot = s.lastIndexOf(".");
+        if(lastComma > lastDot){
+          s = s.replace(/\./g,"").replace(",",".");
+        } else {
+          s = s.replace(/,/g,"");
+        }
+      } else if(hasComma && !hasDot){
+        s = s.replace(/\./g,"").replace(",",".");
+      } else {
+        s = s.replace(/,/g,"");
+      }
+      const n = Number(s);
+      return Number.isFinite(n) ? n : NaN;
+    }
+
+    function formatBRL(n){
+      if(!Number.isFinite(n)) return "—";
+      return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+    }
+
+    function formatPct(n){
+      if(!Number.isFinite(n)) return "—";
+      return (n*100).toFixed(2).replace(".",",") + "%";
+    }
+
+    function escapeHtml(str){
+      return String(str ?? "").replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
+
+    function showMsg(type, html){
+      const el = document.getElementById("statusMsg");
+      if(!html){
+        el.innerHTML = "";
+        return;
+      }
+      el.innerHTML = `<div class="${type}">${html}</div>`;
+    }
+
+    function statusForProgress(p){ // p 0..1
+      if(p < 0.60) return "var(--good)";
+      if(p < 0.85) return "var(--warn)";
+      return "var(--bad)";
+    }
+
+    function rateFor(id, tipo){
+      const t = normalizeTipo(tipo);
+      if(t === "MATRIZ") return RATE_14;
+      if(t === "FILIAL") return RATE_11;
+
+      const key = normalizeKey(id);
+      return SPECIAL_14.has(key) ? RATE_14 : RATE_11;
+    }
+
+    function goalLabel(goalMode){
+      return goalMode === GOAL_MODE_VENDAS ? "VENDAS (R$)" : "DAS (R$)";
+    }
+
+    function progressLabel(goalMode){
+      return goalMode === GOAL_MODE_VENDAS ? "Progresso (Vendas vs META)" : "Progresso (DAS vs META)";
+    }
+
+    function parseCSV(text){
+      const delim = pickDelimiter(text);
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      if(lines.length === 0) return { goal: NaN, goalMode: GOAL_MODE_DAS, rows: [] };
+
+      let goal = NaN;
+      let goalMode = GOAL_MODE_DAS;
+
+      for(const line of lines){
+        const cols = line.split(delim).map(x => x.trim());
+        const first = normalizeKey(cols[0] || "");
+
+        if(first === "META_VENDAS" || first === "META VENDAS"){
+          goal = toNumberBR(cols[1]);
+          goalMode = GOAL_MODE_VENDAS;
+          break;
+        }
+        if(first === "META_DAS" || first === "META" || first === "GOAL"){
+          goal = toNumberBR(cols[1]);
+          goalMode = GOAL_MODE_DAS;
+          break;
+        }
+      }
+
+      const dataLines = lines.filter(l => {
+        const c = l.split(delim)[0];
+        const k = normalizeKey(c);
+        return !["META","GOAL","META_DAS","META_VENDAS","META VENDAS"].includes(k);
+      });
+
+      if(dataLines.length === 0) return { goal, goalMode, rows: [] };
+
+      const first = dataLines[0].split(delim).map(x => x.trim());
+      const looksHeader = first.some(v => /[a-zA-Z]/.test(v)) && first.length >= 2;
+
+      let startIdx = 0;
+      let headers = null;
+
+      if(looksHeader){
+        headers = first.map(h => normalizeKey(h));
+        startIdx = 1;
+      }
+
+      const rows = [];
+      for(let i=startIdx;i<dataLines.length;i++){
+        const cols = dataLines[i].split(delim).map(x => x.trim());
+        if(cols.length < 2) continue;
+
+        if(headers){
+          const candidatesEmpresa = ["EMPRESA","CNPJ","FILIAL","NOME","ID","UNIDADE","RAZAO SOCIAL","RAZAOSOCIAL"];
+          const candidatesTipo   = ["TIPO","CLASSIFICACAO","CATEGORIA"];
+          const candidatesTotal  = ["TOTAL","VENDAS","TOTAL VENDAS","TOTALVENDAS","VALOR","VALORTOTAL","TOTAL NOTAS","FATURAMENTO","RECEITA","TOTALVENDASR$"];
+
+          let empresaIdx = 0;
+          let tipoIdx = -1;
+          let totalIdx = 1;
+
+          const he = headers.findIndex(h => candidatesEmpresa.some(c => h.includes(c)));
+          if(he >= 0) empresaIdx = he;
+
+          const ht = headers.findIndex(h => candidatesTipo.some(c => h.includes(c)));
+          if(ht >= 0) tipoIdx = ht;
+
+          const hv = headers.findIndex(h => candidatesTotal.some(c => h.includes(c)));
+          if(hv >= 0) totalIdx = hv;
+
+          const empresa = cols[empresaIdx];
+          const tipo = (tipoIdx >= 0 ? cols[tipoIdx] : "");
+          const total = toNumberBR(cols[totalIdx]);
+
+          if(empresa && Number.isFinite(total)){
+            rows.push({ id: empresa, tipo, total });
+          }
+        } else {
+          const empresa = cols[0];
+          let tipo = "";
+          let total = NaN;
+
+          if(cols.length >= 3){
+            tipo = cols[1];
+            total = toNumberBR(cols[2]);
+          } else {
+            total = toNumberBR(cols[1]);
+          }
+
+          if(empresa && Number.isFinite(total)){
+            rows.push({ id: empresa, tipo, total });
+          }
+        }
+      }
+
+      return { goal, goalMode, rows };
+    }
+
+    function render(goal, rows, goalMode){
+      const rawTable = document.getElementById("rawTable");
+      const rawBody  = document.getElementById("rawBody");
+      const cards    = document.getElementById("cards");
+
+      rawBody.innerHTML = "";
+      cards.innerHTML = "";
+
+      document.getElementById("kpiGoalTitle").textContent = `META (pico do termômetro) — ${goalLabel(goalMode)}`;
+      document.getElementById("progressHeader").textContent = progressLabel(goalMode);
+
+      if(!Number.isFinite(goal) || goal <= 0){
+        document.getElementById("kpiGoal").textContent  = "—";
+        document.getElementById("kpiSales").textContent = "—";
+        document.getElementById("kpiDas").textContent   = "—";
+        document.getElementById("kpiCount").textContent = "—";
+        rawTable.style.display = "none";
+        showMsg("error",
+          `META não encontrada no CSV. Inclua uma linha como <b>META_DAS;50000</b> ou <b>META_VENDAS;50000</b>.`
+        );
+        return;
+      }
+
+      if(!rows || rows.length === 0){
+        document.getElementById("kpiGoal").textContent  = formatBRL(goal);
+        document.getElementById("kpiSales").textContent = "—";
+        document.getElementById("kpiDas").textContent   = "—";
+        document.getElementById("kpiCount").textContent = "0";
+        rawTable.style.display = "none";
+        showMsg("error","Não encontrei linhas de empresas com valores válidos no CSV.");
+        return;
+      }
+
+      const map = new Map();
+      for(const r of rows){
+        const k = normalizeKey(r.id);
+        const cur = map.get(k) || { id: r.id, tipo: normalizeTipo(r.tipo), total: 0 };
+        cur.total += r.total;
+        cur.id = r.id;
+
+        const tNew = normalizeTipo(r.tipo);
+        const tOld = cur.tipo;
+        if(tNew){
+          if(!tOld) cur.tipo = tNew;
+          else if(tOld !== tNew) cur.tipo = "MISTO";
+        }
+        map.set(k, cur);
+      }
+
+      const items = [...map.values()].map(x => {
+        const key = normalizeKey(x.id);
+        const tipo = normalizeTipo(x.tipo);
+        const rate = rateFor(key, tipo);
+        const das = x.total * rate;
+
+        const base = (goalMode === GOAL_MODE_VENDAS) ? x.total : das;
+        const ratio = base / goal;
+        const progress = Math.max(0, Math.min(ratio, 1));
+
+        return { key, label: x.id, tipo: tipo || "", total: x.total, rate, das, progress, base, ratio };
+      }).sort((a,b) => b.das - a.das);
+
+      const totalSales = items.reduce((s,i) => s+i.total, 0);
+      const totalDas   = items.reduce((s,i) => s+i.das, 0);
+
+      document.getElementById("kpiGoal").textContent  = formatBRL(goal);
+      document.getElementById("kpiSales").textContent = formatBRL(totalSales);
+      document.getElementById("kpiDas").textContent   = formatBRL(totalDas);
+      document.getElementById("kpiCount").textContent = String(items.length);
+
+      const goalModeText = goalMode === GOAL_MODE_VENDAS ? "VENDAS" : "DAS";
+      showMsg("ok", `Relatório carregado. META (pico do termômetro) em <b>${goalModeText}</b>: <b>${formatBRL(goal)}</b>.`);
+
+      rawTable.style.display = "";
+      for(const it of items){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><b>${escapeHtml(it.label)}</b><div class="muted" style="font-size:12px;margin-top:3px">${it.key}</div></td>
+          <td>${escapeHtml(it.tipo || "—")}</td>
+          <td class="right">${formatBRL(it.total)}</td>
+          <td class="right">${formatPct(it.rate)}</td>
+          <td class="right"><b>${formatBRL(it.das)}</b></td>
+          <td class="right"><b>${Math.round(it.progress*100)}%</b></td>
+        `;
+        rawBody.appendChild(tr);
+      }
+
+      for(const it of items){
+        const pct = Math.round(it.progress * 100);
+        const color = statusForProgress(it.progress);
+        const capClass = (it.ratio >= 1) ? "max" : (it.ratio >= 0.90 ? "hot" : "");
+
+        const tipoLabel = it.tipo ? it.tipo : "NÃO INFORMADO";
+        const badgeRate = it.rate === RATE_14 ? "Alíquota 14%" : "Alíquota 11%";
+
+        let ruleNote = "";
+        if(it.tipo === "MATRIZ") ruleNote = "Tipo MATRIZ aplicado";
+        else if(it.tipo === "FILIAL") ruleNote = "Tipo FILIAL aplicado";
+        else if(it.tipo === "MISTO") ruleNote = "Tipos conflitantes (MISTO) — use um Tipo único por Empresa no CSV";
+        else ruleNote = (SPECIAL_14.has(it.key) ? "Fallback (WOOD/ARBO/CAMP)" : "Fallback (demais)");
+
+        const baseLabel = (goalMode === GOAL_MODE_VENDAS) ? "Vendas" : "DAS";
+        const metaLabel = (goalMode === GOAL_MODE_VENDAS) ? "META (pico) — Vendas (R$)" : "META (pico) — DAS (R$)";
+        const progressText = (goalMode === GOAL_MODE_VENDAS)
+          ? `Progresso = <b>Vendas / META</b>. Se ultrapassar 100%, o termômetro encosta no topo.`
+          : `Progresso = <b>DAS / META</b>. Se ultrapassar 100%, o termômetro encosta no topo.`;
+
+        const div = document.createElement("div");
+        div.className = "company";
+        div.innerHTML = `
+          <div class="companyTop">
+            <div>
+              <div class="name">${escapeHtml(it.label)}</div>
+              <div class="meta">Tipo: <b>${escapeHtml(tipoLabel)}</b> • ${escapeHtml(ruleNote)} • Base do termômetro: <b>${baseLabel}</b></div>
+            </div>
+            <div class="badge">${escapeHtml(badgeRate)}</div>
+          </div>
+
+          <div class="layout">
+            <div class="thermoWrap">
+              <div>
+                <div class="thermometer" aria-label="Termômetro">
+                  <div class="cap ${capClass}"></div>
+                  <div class="tube">
+                    <div class="fill" style="height:0%;"></div>
+                  </div>
+                  <div class="ticks" aria-hidden="true">
+                    <div class="tick">100%</div>
+                    <div class="tick">75%</div>
+                    <div class="tick">50%</div>
+                    <div class="tick">25%</div>
+                    <div class="tick">0%</div>
+                  </div>
+                  <div class="bulb"></div>
+                </div>
+                <div class="thermoPct">${pct}% da META</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="details">
+                <div class="detail">
+                  <div class="t">Faturado (R$)</div>
+                  <div class="v">${formatBRL(it.total)}</div>
+                </div>
+                <div class="detail">
+                  <div class="t">DAS estimado (R$)</div>
+                  <div class="v">${formatBRL(it.das)}</div>
+                </div>
+                <div class="detail">
+                  <div class="t">${escapeHtml(metaLabel)}</div>
+                  <div class="v">${formatBRL(goal)}</div>
+                </div>
+              </div>
+
+              <div class="small" style="margin-top:10px">
+                ${progressText}
+              </div>
+            </div>
+          </div>
+        `;
+        cards.appendChild(div);
+
+        requestAnimationFrame(() => {
+          const fill = div.querySelector(".fill");
+          fill.style.height = pct + "%";
+        });
+      }
+    }
+
+    // --- Upload CSV ---
+    const fileInput = document.getElementById("csvFile");
+    fileInput.addEventListener("change", async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      const text = await f.text();
+      const parsed = parseCSV(text);
+      render(parsed.goal, parsed.rows, parsed.goalMode);
+    });
+
+    // --- Editor manual ---
+    const DEFAULT_META = 50000;
+    const DEFAULT_META_MODE = GOAL_MODE_DAS;
+
+    const editor = document.getElementById("editor");
+    const addRowBtn = document.getElementById("addRowBtn");
+    const exportCsvBtn = document.getElementById("exportCsvBtn");
+
+    function addEditorRow(empresa="", tipo="", total=""){
+      const row = document.createElement("div");
+      row.className = "editorRow";
+      row.innerHTML = `
+        <div><input class="cellInput" type="text" placeholder="Ex.: WOOD / ARBO / CAMP / SALTO" value="${escapeHtml(empresa)}"></div>
+        <div><input class="cellInput" type="text" placeholder="MATRIZ ou FILIAL" value="${escapeHtml(tipo)}"></div>
+        <div><input class="cellInput" type="text" placeholder="Ex.: 125000,00" value="${escapeHtml(total)}"></div>
+        <div class="right">
+          <button type="button" class="danger">Remover</button>
+        </div>
+      `;
+      const btn = row.querySelector("button");
+      btn.addEventListener("click", () => row.remove());
+      editor.appendChild(row);
+    }
+
+    addRowBtn.addEventListener("click", () => addEditorRow());
+
+    exportCsvBtn.addEventListener("click", () => {
+      const rows = [...editor.querySelectorAll(".editorRow")].slice(1);
+      const data = [];
+
+      for(const r of rows){
+        const inputs = r.querySelectorAll("input");
+        const empresa = (inputs[0].value || "").trim();
+        const tipoRaw = (inputs[1].value || "").trim();
+        const tipo = normalizeTipo(tipoRaw);
+        const totalStr = (inputs[2].value || "").trim();
+        const total = toNumberBR(totalStr);
+
+        if(!empresa) continue;
+        if(!Number.isFinite(total)) continue;
+
+        if(tipoRaw && !(tipo === "MATRIZ" || tipo === "FILIAL")){
+          showMsg("error", `Tipo inválido para <b>${escapeHtml(empresa)}</b>: use <b>MATRIZ</b> ou <b>FILIAL</b>.`);
+          return;
+        }
+
+        data.push({ empresa, tipo: tipo || "", total });
+      }
+
+      if(data.length === 0){
+        showMsg("error","Nada para exportar. Preencha ao menos 1 linha com Total válido.");
+        return;
+      }
+
+      const metaKey = (DEFAULT_META_MODE === GOAL_MODE_VENDAS) ? "META_VENDAS" : "META_DAS";
+
+      const lines = [];
+      lines.push(`${metaKey};${String(DEFAULT_META).replace(".",",")}`);
+      lines.push(`Empresa;Tipo;TotalVendas`);
+
+      for(const d of data){
+        const asBR = d.total.toFixed(2).replace(".",",");
+        lines.push(`${d.empresa};${d.tipo};${asBR}`);
+      }
+
+      const csv = lines.join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "das_termometro.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      showMsg("ok", `CSV exportado (<b>Empresa;Tipo;TotalVendas</b>) com meta: <b>${metaKey};${DEFAULT_META}</b>.`);
+    });
+
+    addEditorRow();
+    addEditorRow();
+    addEditorRow();
+
+    showMsg("ok", "Pronto. Carregue um CSV com META_DAS/META_VENDAS e colunas Empresa;Tipo;TotalVendas — ou monte e exporte pelo editor.");
+  </script>
+</body>
+</html>
